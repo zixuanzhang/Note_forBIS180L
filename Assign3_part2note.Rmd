@@ -1,0 +1,44 @@
+---
+title: "Assign3_part2note"
+output: html_notebook
+---
+
+```{r}
+getwd()
+# setwd("/Users/zixuanzhang/Desktop/BIS_180L")
+library(tidyverse)
+library(stringr)
+```
+
+Read data from compressed file
+```{r}
+plant_worm <- read_tsv("plant_vs_worm.blastout.gz",
+                       col_names=c("query_id",
+                                   "subject_id",
+                                   "pct_ident",
+                                   "len",
+                                   "mis",
+                                   "gaps",
+                                   "qb",
+                                   "qe",
+                                   "sb",
+                                   "se",
+                                   "E",
+                                   "Score"))
+worm_plant <- read_tsv("worm_vs_plant.blastout.gz",
+                       col_names=c("query_id",
+                                   "subject_id",
+                                   "pct_ident",
+                                   "len",
+                                   "mis",
+                                   "gaps",
+                                   "qb",
+                                   "qe",
+                                   "sb",
+                                   "se",
+                                   "E",
+                                   "Score"))
+head(plant_worm)
+head(worm_plant)
+```
+
