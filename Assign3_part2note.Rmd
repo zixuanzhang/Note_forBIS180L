@@ -164,3 +164,11 @@ worm_with_recip <- worm_with_recip %>%
 head(worm_with_recip, 15)        
 ```
 
+find orthologs for worm_with
+```{r}
+worm_with_recip_orthologs <- worm_with_recip %>%
+  filter(query_id == subject_id.plant_worm, E.worm_plant < 1e-04, E_diff.worm_plant < -2)
+nrow(worm_with_recip_orthologs)
+```
+
+
