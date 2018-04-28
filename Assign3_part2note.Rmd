@@ -3,14 +3,14 @@ title: "Assign3_part2note"
 output: html_notebook
 ---
 
-```{r}
+```{r, echo=FALSE}
 getwd()
 # setwd("/Users/zixuanzhang/Desktop/BIS_180L")
 library(tidyverse)
 library(stringr)
 ```
 
-Read data from compressed file
+#### Read and clean data frame from compressed file
 ```{r}
 plant_worm <- read_tsv("plant_vs_worm.blastout.gz",
                        col_names=c("query_id",
@@ -40,5 +40,127 @@ worm_plant <- read_tsv("worm_vs_plant.blastout.gz",
                                    "Score"))
 head(plant_worm)
 head(worm_plant)
+```
+
+make a columb recording E value of the next best hit
+the dataset contain up to 4 best hit of each query gene 
+
+1. plant_worm
+```{r}
+plant_worm <- plant_worm %>% 
+  arrange(query_id, E) %>% # firstly arranged by query_id(same goes together), then by E from low to high
+  group_by(query_id) %>% # operation will be performed within each group (query_id)
+  mutate(nextE = lead(E)) %>% # make a new col records the next lowest value of E for each group(query_id)
+  ungroup() 
+head(plant_worm,15)  
+```
+
+2. worm_plant
+```{r}
+worm_plant <- worm_plant %>%
+  arrange(query_id, E) %>%
+  group_by(query_id) %>%
+  mutate(nextE = lead(E)) %>%
+  ungroup()
+head(worm_plant, 15)
+```
+
+We want to know the __difference__ between the E-value of the best hit and the next best hit. It will be easiest to read if convert the E-values to __log10 scale__ first
+```{r}
+plant_worm <- plant_worm %>%
+  mutate(E_diff = log10(E) - log10(nextE)) # best hit is the one with smallest E_diff
+worm_plant <- worm_plant %>%
+  mutate(E_diff = log10(E) - log10(nextE))
+head(plant_worm,15)
+head(worm_plant,15)
+```
+
+Filter to get the best hit, and select only revelant cols
+
+1. plant_worm
+```{r}
+plant_worm_best <- plant_worm %>%
+  arrange(query_id, E, desc(Score)) %>% # arrange score from high to low if two hits have same E value
+  filter(!duplicated(query_id)) %>% # remove the duplicated query_id such that keep the first the one only (unordered)
+  select(query_id, subject_id, pct_ident, len, E, nextE, E_diff, Score) # select cols
+
+head(plant_worm_best,15)
+```
+
+2. worm_plant
+```{r}
+worm_plant_best <- worm_plant %>%
+  arrange(query_id, E, desc(Score)) %>%
+  filter(!duplicated(query_id)) %>%
+  select(query_id, subject_id, pct_ident, len, E, nextE, E_diff, Score)
+head(worm_plant_best, 15)
+```
+
+Modification of subject_id in plant_worm_best: subject worm id is too long
+To make it shorten and more readable:
+```{r}
+plant_worm_best <- plant_worm_best %>%
+  mutate(subject_id = str_replace(subject_id, "#.*","")) # search for string begins with # and replace it with nothing
+head(plant_worm_best, 15)
+```
+
+
+#### create reciprocal table
+create a table of __Arabidopsis genes__ that includes the reciprocal blast results
+```{r}
+plant_with_recip <- left_join(plant_worm_best, worm_plant_best, 
+                              by = c("subject_id" = "query_id"),
+                              suffix = c(".plant_worm", ".worm_plant")) %>% 
+  # if there are non-joined duplicate in x and y, suffix will be added to the output .x and .y
+  select(query_id, subject_id, subject_id.worm_plant, everything())
+head(plant_with_recip, 15)
+```
+
+keep the isoform of plant gene in the blast of plant_worm
+```{r}
+plant_with_recip <- plant_with_recip %>%
+  mutate(query_id = str_sub(query_id, 1,9),
+         subject_id.worm_plant=str_sub(subject_id.worm_plant,1,9)) %>% # all isoform of plants genes now share the same name, so we have so many replicates to remove (isoform id are the same as query id)
+  arrange(query_id, Score.plant_worm) %>%
+  filter(!duplicated(query_id)) %>%
+  ungroup()
+
+head(plant_with_recip) 
+```
+now we have a plant reciprocal table with the best hit E value and score
+Then we need to decide which one an ortholog, some criteria need to be used
+
+Criteria to be used to select rows of orthologs: 
+1. query_id = subject_id.worm_plant
+2. E value < 1e-04
+3. E_diff.plant_worm < -2 to make it a __single best hit__
+
+```{r}
+head(plant_with_recip)
+plant_with_recip_orthologs <- plant_with_recip %>%
+  filter(query_id == subject_id.worm_plant, E.plant_worm < 1e-04, E_diff.plant_worm < -2)
+nrow(plant_with_recip_orthologs)
+```
+
+Create worm reciprocal table:
+Do the same analysis to worm reciprocal table
+```{r}
+worm_with_recip <- left_join(worm_plant_best, plant_worm_best, 
+                              by = c("subject_id" = "query_id"),
+                              suffix = c(".worm_plant", ".plant_worm")) %>% 
+  # if there are non-joined duplicate in x and y, suffix will be added to the output .x and .y
+  select(query_id, subject_id, subject_id.plant_worm, everything())
+head(worm_with_recip, 15)
+```
+
+
+```{r}
+worm_with_recip <- worm_with_recip %>%
+  mutate(query_id=str_replace(query_id,"[a-z]$",""),
+         subject_id.plant_worm=str_replace(subject_id.plant_worm,"[a-z]$","")) %>% # isoforms have the same name
+  arrange(query_id,Score.worm_plant) %>% # find the best score for each duplicated hit
+  filter(!duplicated(query_id)) %>% # attain the best hit for each worm gene
+  ungroup()
+head(worm_with_recip, 15)        
 ```
 
