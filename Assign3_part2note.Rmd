@@ -121,12 +121,13 @@ keep the isoform of plant gene in the blast of plant_worm
 plant_with_recip <- plant_with_recip %>%
   mutate(query_id = str_sub(query_id, 1,9),
          subject_id.worm_plant=str_sub(subject_id.worm_plant,1,9)) %>% # all isoform of plants genes now share the same name, so we have so many replicates to remove (isoform id are the same as query id)
-  arrange(query_id, Score.plant_worm) %>%
+  arrange(query_id, Score.plant_worm) #%>%
   filter(!duplicated(query_id)) %>%
   ungroup()
 
 head(plant_with_recip) 
 ```
+
 now we have a plant reciprocal table with the best hit E value and score
 Then we need to decide which one an ortholog, some criteria need to be used
 
@@ -140,6 +141,7 @@ head(plant_with_recip)
 plant_with_recip_orthologs <- plant_with_recip %>%
   filter(query_id == subject_id.worm_plant, E.plant_worm < 1e-04, E_diff.plant_worm < -2)
 nrow(plant_with_recip_orthologs)
+head(plant_with_recip_orthologs)
 ```
 
 Create worm reciprocal table:
