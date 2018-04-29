@@ -1,0 +1,257 @@
+---
+title: "ggplot"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r, echo=FALSE}
+library(tidyverse)
+tomato <- read_csv("Tomato.csv")
+head(tomato)
+```
+
+see the species names:
+```{r}
+unique(tomato$species)
+```
+
+#### Aesthetic
+`color`:  
+1. plot petleng against leafleng(scatterplot)
+2. color the point by treatment, L or H
+```{r}
+tomato %>% ggplot(mapping = aes(x=petleng, y=leafleng, color = trt)) + 
+  geom_point()
+```
+
+`shape`: control the shape of plotted points.  
+`fill` : control the color fill of the shape  
+
+Create a plot of int3 vs int4 where color indicates __trt__, and shape indicates __who__ measured the plant.  
+```{r}
+tomato %>% ggplot(aes(x = int3, y = int4, color = trt, shape = who)) +
+           geom_point()
+```
+
+`size`: control the size of the plotted point  
+create a plot of latitude vs longitude where altitude is indicated by the size of the point and species is indicated by color  
+```{r}
+tomato %>% ggplot(aes(x=lat, y=lon, size = alt, color = species)) + geom_point()
+```
+
+#### change plot setting without refering to the cols  
+change dots color to skyblue
+```{r}
+tomato %>% ggplot(mapping = aes(x=petleng,y=leafleng)) +
+  geom_point(color="skyblue") # change in the geom function
+```
+
+`shape`: The different plotting shapes are numbered from __0 to 25__  
+```{r}
+tomato %>% ggplot(mapping = aes(x=petleng,y=leafleng)) +
+  geom_point(color="skyblue", shape = 2) # triangle
+```
+
+#### Geom() control the type of plot that is made.  
+* `Geom_smooth()` : add trend lines to your plots  
+```{r}
+tomato %>% ggplot(aes(x=lon, y = lat)) + 
+  geom_smooth() # only add trendlines, no scatter points; if not specified, it will use geom_smooth(method = "gam")
+```
+
+* we can add multiple geom to a plot 
+example: trendline + scatter plot
+```{r}
+tomato %>% ggplot(aes(x=lon, y = lat)) + 
+  geom_smooth() +
+  geom_point()
+```
+
+* add linear regress best fit line to the plot:  
+```{r}
+tomato %>% ggplot(aes(x=lon, y = lat)) + 
+  geom_smooth(method="lm") + # linear model
+  geom_point()
+```
+
+* `geom_histogram()` and `geom_density()`: create histograms, only take x value, y value is calculated for you  
+```{r}
+tomato %>% ggplot(aes(x=hyp)) +
+  geom_histogram(binwidth = 5)
+```
+
+`fill` use control the color used to fill the bars  
+```{r}
+tomato %>% ggplot(aes(x=hyp)) +
+  geom_histogram(fill="red")
+```
+
+`geom_density`  
+```{r}
+tomato %>% ggplot(aes(x=hyp)) + 
+geom_density()
+```
+
+density plot allows comparision between two density:  
+```{r}
+tomato %>% ggplot(aes(x=hyp, fill=trt)) +
+  geom_density(alpha=.5) # alpha value change the color density 0-1, low to high
+```
+
+* `geom_boxplot()` and `geom_violin()`: provide quick summaries of different classes of data  
+examine hypocotyl length(hyp) of each species. We can map hypocotyl length to the y-axis and species to the x-axis
+```{r}
+tomato %>% ggplot(aes(x=species, y=hyp)) +
+  geom_boxplot()
+```
+
+```{r}
+tomato %>% ggplot(aes(x=species, y=hyp)) +
+  geom_violin()
+```
+
+Make a boxplot showing hypocotyl length for the “H” and “L” treatments
+```{r}
+tomato %>% ggplot(aes(x=trt, y=hyp)) +
+  geom_violin() 
+```
+
+```{r}
+tomato %>% ggplot(aes(x=species, y=int3, fill = trt)) +
+  geom_boxplot()
+```
+
+* `geom_col(): make a classic __bar chart__, where the height of the bars corresponds to some value in the data  
+
+1. summarize the data  
+```{r}
+# write a function to calculate sample mean error (SE)
+sem <- function(x, na.rm=FALSE) { # by default na.rm = FALSE
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+}
+
+int3.mean.sem <- tomato %>%
+  group_by(species, trt) %>%
+  summarize(mean=mean(int3, na.rm=TRUE), sem=sem(int3, na.rm=TRUE))
+
+int3.mean.sem
+```
+
+2. Plot the __bar plot__ for int3 mean across species and treatment  
+```{r}
+int3.mean.sem %>% ggplot(aes(x=species, y = mean, fill=trt)) +
+  geom_col(position="dodge") # plot bar bins side by side instead of stacking up
+```
+
+3. Add error bar  
+```{r}
+int3.mean.sem %>% ggplot(aes(x=species, 
+                             y = mean, 
+                             fill=trt, 
+                             ymax=mean+sem, 
+                             ymin=mean-sem)) +
+  geom_col(position="dodge") +
+  geom_errorbar(position = position_dodge(width=0.9), width=.5)
+```
+
+Example: Make a bar chart that shows __average leaf length__ for each accession (acs) and trt combination.  
+```{r}
+# calculate average leaf length for each combination:
+leaf.mean.sem <- tomato %>%
+  group_by(acs, trt) %>%
+  summarize(mean=mean(int3, na.rm=TRUE), sem=sem(int3, na.rm=TRUE))
+leaf.mean.sem
+
+# plot 
+leaf.mean.sem %>% ggplot(aes(x=acs, 
+                              y = mean, 
+                              fill = trt,
+                              ymax = mean+sem,
+                              ymin = mean-sem)) +  
+                              geom_col(position="dodge") +
+  geom_errorbar(position = position_dodge(width=0.9), width=.5)
+```
+
+* `geom_line()`: data appropriate for bar charts also can be plotted using lines  
+```{r}
+int3.mean.sem %>% ggplot(aes(x=species,
+                             y=mean,
+                             color=trt,
+                             group=trt,
+                             shape=trt,
+                             ymax=mean+sem,
+                             ymin=mean-sem)) +
+  geom_line() +
+  geom_errorbar(width=.1) +
+  geom_point()
+```
+
+however, plotting each species’ reaction to the treatment would make more sense:  
+```{r}
+int3.mean.sem %>% ggplot(aes(x = trt, 
+                             y = mean, 
+                             color = species, 
+                             group = species, 
+                             shape = species)) + geom_line() + geom_point()
+```
+
+#### Scale() functions  
+* we want to fill the bar manually with different colors  
+```{r}
+int3.mean.sem %>% ggplot(aes(x=species, y = mean, fill=trt, ymax=mean+sem, ymin=mean-sem)) +
+  geom_col(position="dodge") +
+  geom_errorbar(position = position_dodge(width=0.9), width=.5) +
+  scale_fill_manual(values = c("H"="#999999","L"="#E69F00")) # plus this command
+```
+
+* a particular useful one to transform x or y to log scale:  
+`scale_y_log10()` and `scale_x_log10()`  
+
+#### Facets 
+Previous method: the code below separates the data into “H” and “L” treatments before making the density plot.
+
+```{r}
+tomato %>% ggplot(aes(x=int3, fill=trt)) +
+  geom_density(alpha=.5)
+```
+
+Another way to do this: `facet_wrap()` or `facet_grid()`  
+`facet_wrap()` separate two densities into two graphs (in a row)  
+```{r}
+tomato %>% ggplot(aes(x=int3)) +
+  geom_density(fill="lightblue") +
+  facet_wrap(~ trt) # separate by treatment L and H
+```
+
+modify the code above to separate two densities in two rows: 
+```{r}
+tomato %>% ggplot(aes(x=hyp)) +
+  geom_density(fill="papayawhip") +
+  facet_wrap(~ trt, nrow = 2) # specify by nrow = , ncol= ,
+```
+
+`facet_grid()` can use __two variables__ to facet and uses those variable to specify the grid of rows and columns:
+```{r}
+# separate variables in int3 
+tomato %>% ggplot(aes(x=int3)) +
+  geom_histogram(fill="lawngreen") +
+  facet_grid(who ~ trt) + # specify which two variables you want to separate in int3, order matters here, 
+  ylim(0,40) # change the y scale limit, or xlim()
+```
+
+* Titles and labels  
+```{r}
+tomato %>% ggplot(aes(x=species,y=int3,fill=trt)) +
+  geom_boxplot() +
+  ggtitle("Tomato") + # add title to the boxplot
+  ylab("Internode 3 (mm)") + # change y axis label
+  xlab("Tomato Species") # change x axis label
+```
+
+* save your plot to another file:  
+R will figure out the appropriate file type from the file extension (pdf, png, jpg, tif)
+```{r}
+ggsave("~/Desktop/Internode3.pdf", height=6, width = 6)
+```
+
