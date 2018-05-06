@@ -1,0 +1,50 @@
+---
+title: "wide_longformat"
+output:
+  html_document:
+    keep_md: yes
+---
+read data
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(stringr)
+data(iris)
+iris
+irisex <- iris %>% select(Species, everything())
+irisex
+```
+
+see above that "tomato" is in the wide format  
+each row contains all the category information about a species;  
+
+
+#### convert format into long format  
+long format by `gather()` command
+```{r}
+irisex_long <- irisex %>%
+  gather(key = "data_type", # the new col name
+         value = "value", # the observations of selected col
+         Sepal.Length, Sepal.Width)
+View(irisex_long)
+```
+
+apply function to specific cols and rows
+```{r}
+m <- matrix(rnorm(24), ncol = 6)
+m
+cat("\nrow minimums: \n")
+apply(m,1,min) # apply min function to each row of data m
+
+cat("\nrow means: \n")
+apply(m,1,mean)
+
+```
+
+some quick functions to calculate means and sums
+```{r}
+rowMeans(m)
+colMeans(m)
+rowSums(m)
+colSums(m)
+```
+
