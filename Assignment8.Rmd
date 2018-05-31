@@ -110,10 +110,160 @@ GxE_cor
 
 Rank the correlation
 ```{r}
-GxE_rank <- apply(GxE_cor,2,function(x) rank(-abs(x)))
+# 2 means cols, 1 means rows
+GxE_rank <- apply(GxE_cor,2,function(x) rank(-abs(x))) 
+# rank for each column from high to low
 GxE_rank
 ```
 
 Exercise 4:  
-“1” in the [“Bra035334”, “Bra033034”] cell means these two genes have the greatest correlation.  
-yes they have different value. 
+(A) “1” in the [“Bra035334”, “Bra033034”] cell means these two genes have the greatest correlation.  
+
+(B) yes they have different value. because we are ranking for every column. In each column, the ranking for particular pair can be different depending on the values within that column.
+
+compare pairwise mutual ranks (average ranks)
+```{r}
+GxE_MR <- sqrt(GxE_rank * t(GxE_rank))
+GxE_MR
+```
+
+(C) no, their values are the same. because we are doing above is to multiply the different ranking for each given pair to their counterpart different ranking, such that they will agree on the ranking score. then take the average to obtain the average value which is also the same for each pair. 
+
+
+Define edge: rank less or equal than 2  
+
+(A)
+```{r}
+genes_adj_MR2 <- GxE_MR <= 2
+diag(genes_adj_MR2) <- 0
+genes_adj_MR2
+```
+
+(B) Bra035334 is connected to Bra033034 and Bra003598
+
+
+Exercise 6
+
+genes_adj_MR3
+```{r}
+GxE_cor <- cor(t(GxE_counts))
+GxE_cor %>% round(3) # round to three decimal points
+# set diagonal to 0
+diag(GxE_cor) <- 0
+GxE_cor
+```
+
+```{r}
+# 2 means cols, 1 means rows
+GxE_rank <- apply(GxE_cor,2,function(x) rank(-abs(x))) 
+# rank for each column from high to low
+GxE_MR <- sqrt(GxE_rank * t(GxE_rank))
+GxE_MR
+```
+
+```{r}
+genes_adj_MR3 <- GxE_MR <= 3 # cut off 3
+diag(genes_adj_MR3) <- 0
+genes_adj_MR3
+```
+
+```{r}
+genes_adj_MR10 <- GxE_MR <= 10 # cut off 10
+diag(genes_adj_MR10) <- 0
+genes_adj_MR10
+```
+
+(B)
+```{r}
+sum(genes_adj_MR3)
+sum(genes_adj_MR10)
+```
+
+Exercise 7 plot networks for MR3 and MR10
+```{r}
+gene_graphMR3 <- graph.adjacency(genes_adj_MR3, mode = "undirected") #convert adjacency to graph
+comps <- clusters(gene_graphMR3)$membership                        #define gene cluster membership
+colbar <- rainbow(max(comps)+1)                                   #define colors
+V(gene_graphMR3)$color <- colbar[comps+1]                          #assign colors to nodes
+plot(gene_graphMR3, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+  
+gene_graphMR10 <- graph.adjacency(genes_adj_MR10, mode = "undirected") #convert adjacency to graph
+comps <- clusters(gene_graphMR10)$membership                        #define gene cluster membership
+colbar <- rainbow(max(comps)+1)                                   #define colors
+V(gene_graphMR10)$color <- colbar[comps+1]                          #assign colors to nodes
+plot(gene_graphMR10, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+Answer: MR10 has more edges such that the network looks more complicated than MR3. color = membership?
+
+Exercise 8 graph density
+
+```{r}
+graph.density(gene_graphMR10)
+average.path.length(gene_graphMR10)
+```
+
+
+We get the shortest paths between ALL genes in the network and then print the results. We are interested in visualizing the path between Bra033034 (row number 2) and Bra009406 (column number 7). This is where the 2 and 7 arguments come from in get.shortest.paths()
+
+```{r}
+gene_graphMR10 <- graph.adjacency(genes_adj_MR10, mode = "undirected")
+distMatrix <- shortest.paths(gene_graphMR10, v = V(gene_graphMR10), to = V(gene_graphMR10))
+head(distMatrix)[,1:7]
+
+pl <- get.shortest.paths(gene_graphMR10, 2, 7)$vpath[[1]] # pull paths between node 2 and 7
+
+V(gene_graphMR10)[pl]$color <- paste("green")          # define node color
+E(gene_graphMR10)$color <- paste("grey")               # define default edge color
+E(gene_graphMR10, path = pl)$color <- paste("blue")    # define edge color
+E(gene_graphMR10, path = pl)$width <- 10               # define edge width
+plot(gene_graphMR10, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+Exercise 9
+
+graph density of 1500 miles range
+```{r}
+cities_mat
+
+gene_graphcities <- graph.adjacency(cities_mat, mode = "undirected") #convert adjacency to graph
+comps <- clusters(gene_graphcities)$membership                        #define gene cluster membership
+colbar <- rainbow(max(comps)+1)                                   #define colors
+V(gene_graphcities)$color <- colbar[comps+1]                          #assign colors to nodes
+plot(gene_graphcities, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+
+graph.density(gene_graphcities)
+average.path.length(gene_graphcities)
+```
+
+Find shortest btw SEA and DC in 1500 range
+```{r}
+gene_graphcities <- graph.adjacency(cities_mat, mode = "undirected")
+distMatrix <- shortest.paths(gene_graphcities, v = V(gene_graphcities), to = V(gene_graphcities))
+head(distMatrix)[,1:7]
+
+pl <- get.shortest.paths(gene_graphcities, 6, 3)$vpath[[1]] # pull paths between node 2 and 7
+
+V(gene_graphcities)[pl]$color <- paste("green")          # define node color
+E(gene_graphcities)$color <- paste("grey")               # define default edge color
+E(gene_graphcities, path = pl)$color <- paste("blue")    # define edge color
+E(gene_graphcities, path = pl)$width <- 10               # define edge width
+plot(gene_graphcities, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+Find shortest distance btw SEA and DC with 2300 mile range
+
+```{r}
+gene_graphcities <- graph.adjacency(cities_mat_2300, mode = "undirected")
+distMatrix <- shortest.paths(gene_graphcities, v = V(gene_graphcities), to = V(gene_graphcities))
+head(distMatrix)[,1:7]
+
+pl <- get.shortest.paths(gene_graphcities, 6, 3)$vpath[[1]] # pull paths between node 2 and 7
+
+V(gene_graphcities)[pl]$color <- paste("green")          # define node color
+E(gene_graphcities)$color <- paste("grey")               # define default edge color
+E(gene_graphcities, path = pl)$color <- paste("blue")    # define edge color
+E(gene_graphcities, path = pl)$width <- 10               # define edge width
+plot(gene_graphcities, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
