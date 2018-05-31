@@ -1,0 +1,119 @@
+---
+title: "Assignment8-Coexpression"
+output: html_document
+---
+
+Goal: We want to understand how plants connect the upstream perception of **environmental signals** (in this case the presence of neighbors) and how this information cascades through the biological network of the organism to affect the downstream outputs of physiological and developmental changes, eg. **gene expression**
+
+upstream input to downstream output
+
+Network intuition example
+
+```{r}
+cities <- read.delim("us_cities.txt", row.names=1) # be sure to change the path
+cities
+```
+
+choose distance within 1500 miles, assigned to be 1  
+distance outside 1500 miles, assigned to be 0  
+create adjacency matrix  
+
+```{r}
+cities_mat <- cities < 1500 # leave original matrix intact
+diag(cities_mat) <- 0 # we do not have to fly within each of cities; automatically change matrix to 1/0 form because T/F (1/0)
+cities_mat # check out the adjacency matrix
+```
+
+exercise 1:
+```{r}
+rowSums(cities_mat)
+colSums(cities_mat)
+```
+
+Chicago has the largest number, so it is the most highly connected
+
+Try extend cities range to 2000
+
+```{r}
+cities_mat_2000 <- cities < 2000 # leave original matrix intact
+diag(cities_mat_2000) <- 0 # we do not have to fly within each of cities; automatically change matrix to 1/0 form because T/F (1/0)
+cities_mat_2000 # check out the adjacency matrix
+rowSums(cities_mat_2000)
+```
+
+yes it changes to Denver. because Denver is in the midwest where is more ajacent to either west coast cities or east coast cities, within 2000 miles.  
+
+
+Plot network
+```{r}
+library(igraph) # load package
+# make sure to use the 2000 mile distance cutoff 
+cities_graph2 <- graph.adjacency(cities_mat_2000, mode = "undirected")
+plot.igraph(cities_graph2)
+```
+
+exercise 2:  
+total # of nodes: 9  
+total # of edges: 20 (look at the cities_graph2 file, near the title)
+or
+```{r}
+sum(cities_mat_2000)/2
+```
+
+Exercise 3:  
+recalculate using cutoff of 2300  
+```{r}
+cities_mat_2300 <- cities < 2300 # leave original matrix intact
+diag(cities_mat_2300) <- 0 # we do not have to fly within each of cities; automatically change matrix to 1/0 form because T/F (1/0)
+cities_mat_2300 # check out the adjacency matrix
+
+sum(cities_mat_2300)/2
+```
+
+24 edges obtained
+
+----------------
+# gene problem
+We will define each gene as a node and the edges between the nodes as some value that we can calculate to make an adjacency matrix  
+
+We can use **similarity in gene expression values** to measure the biological distance between genes. Genes that are expressed in more similar patterns should be closer.  
+
+load data
+```{r}
+library(tidyverse)
+# make sure to change the path to where you downloaded this using wget
+DE_genes <- read_csv("DEgenes_GxE.csv")
+head(DE_genes) #check out the data
+
+# make sure to change the path to where you downloaded this using wget
+brass_voom_E <- read_csv("voom_transform_brassica.csv")
+brass_voom_E[,-c(38,42,46)] # remove questionable library columns
+head(brass_voom_E)
+
+GxE_counts <- DE_genes %>% select(GeneID) %>% left_join(brass_voom_E) #get count data specifically for the GxE genes
+head(GxE_counts)
+
+GxE_counts <- GxE_counts %>% column_to_rownames("GeneID") %>% as.matrix(GxE_counts) # some of the downstream steps require a data matrix
+head(GxE_counts[,1:6])
+```
+
+start with 5 genes subsets
+```{r}
+GxE_subset <- GxE_counts[1:5,] # first five genes
+# create correlation matrix
+GxE_cor <- cor(t(GxE_subset)) # gene across tissue, each gene is a variable, use gene to describe each sample
+GxE_cor %>% round(3) # round to three decimal points
+# set diagonal to 0
+diag(GxE_cor) <- 0
+GxE_cor
+```
+
+Rank the correlation
+```{r}
+GxE_rank <- apply(GxE_cor,2,function(x) rank(-abs(x)))
+GxE_rank
+```
+
+Exercise 4:  
+“1” in the [“Bra035334”, “Bra033034”] cell means these two genes have the greatest correlation.  
+yes they have different value. 

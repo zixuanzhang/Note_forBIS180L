@@ -1,0 +1,175 @@
+---
+title: "Assignmeng7"
+output: html_document
+---
+
+## clustering introduction
+* three different ways to cluster data: hierarchical clustering, k-means, co-expression
+* get visual summaries of the expression of all genes that had significant GxE interaction
+* basic idea of clustering: find how similar rows or columns in the data set based on the value provided in the data frame.
+
+### Hierarchical clustering
+example: US cities  
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggdendro)
+```
+
+
+import data
+```{r}
+cities <- read.delim("us_cities.txt", row.names = 1) # the first column contain the row name
+head(cities)
+```
+
+clustering cities data
+```{r}
+cities_cluster <- cities %>% as.dist() %>% hclust()
+# as.dist() tells R cities matrix should be used as a matrix
+# hclust() do the hierarchical clustering job
+ggdendrogram(cities_cluster) # plot ggdendrogram
+```
+
+Visual summaries like printed data or plotting the data are often the best ways to make sure things are working the way it should be.
+
+Dataset descrption:  
+RNA-seq data collected from 48 samples in total:  
+* 2 genotype, 2 condition(DP/NDP), 4 combinations, across 4 types of tissues
+* each treatment group has 3 replicates
+* total of 48 samples collected
+
+Model:
+* factor A: genotype, IMB211/R500 (cat.)  
+* factor B: treatment, dense/non-dense (cat.)
+* interaction: A:B
+* reponse: gene expression (reads)
+
+The simplest clustering assumes normally distributed data.  
+RNA-seq data has been transformed to be normal
+
+```{r}
+# read DE genes found by interaction term in the model
+DE_genes <- read_csv("DEgenes_GxE.csv")
+# transformed RNA-seq data for 48 samples (48 cols + 1 gene ID)
+brass_voom_E <- read_csv("voom_transform_brassica.csv")
+```
+
+get count data(expression level) specifically for GxE genes(genes expression level affected by interaction btw genotype and conditions)
+```{r}
+GxE_counts <- DE_genes %>% select(GeneID) %>% left_join(brass_voom_E)
+```
+
+transform the data to matrix form
+```{r}
+GxE_counts <- GxE_counts %>% column_to_rownames("GeneID") %>% as.matrix(GxE_counts)
+head(GxE_counts[,1:6])
+```
+
+Now we have a dataframe of 255 signidicant GxE genes from internode tissue. we can look at these genes across all tissues
+
+calculate Euclidean distance btw data points  
+cluster similar genes to one another based on their similar expression levels across treatment groups
+```{r}
+gene_hclust_row <- GxE_counts %>% dist() %>% hclust()
+ggdendrogram(gene_hclust_row) # overplotting
+```
+
+cluster by column(by treatment group)
+```{r}
+# need to transpose the data frame
+gene_hclust_col <- t(GxE_counts) %>% dist() %>% hclust()
+ggdendrogram(gene_hclust_col)
+```
+
+define important sub-cluster within the tree
+
+```{r}
+plot(gene_hclust_col) # redraw before adding rectangles
+rect.hclust(gene_hclust_col, k = 4, border = "red") # draw four rectangles
+```
+
+
+How to determine which sub-cluster have good support  
+use package **pvclust** to assign p value to clusters.  
+it does this by bootstrap sampling our dataset  
+
+About **bootstrap**:  
+many random samples of data are taken and then cluster on each resampled datasets.  
+Goal: how often the branches present in original dataset appear in the resampled dataset.  
+the more often it appears, the more evidence that it is "real"
+
+```{r}
+library(pvclust) # calculate p-values for hiearchical clustering via multiscale boostrap resampling
+
+set.seed(123456) # ensure we have consistent result
+
+fit <- pvclust(GxE_counts, method.hclust = "ward.D", method.dist = "euclidean", nboot = 50)
+
+plot(fit) # dendogram with p value
+```
+
+BP (in green): Bootstram percentage of bootstrap samples where the branch was observed.  
+AU (in red) : apporximate unbiased; scale the BP based on the number of samples taken.
+
+change nboot to 1000
+```{r}
+set.seed(99) # ensure we have consistent result
+
+fit1000 <- pvclust(GxE_counts, method.hclust = "ward.D", method.dist = "euclidean", nboot = 1000)
+
+plot(fit1000) # dendogram with p value
+```
+
+---------------
+## Heatmaps
+visualize h-clustering results: view the entire matrix at once  
+Heatmaps take all the value within the data matrix and convert them to a color value  
+
+```{r}
+library(gplots)
+
+plot(gene_hclust_row)
+
+heatmap.2(GxE_counts, Rowv = as.dendrogram(gene_hclust_row), scale = "row", density.info = "none", trace = "none")
+```
+
+
+## K-means clustering
+
+K-means: fit centering points; specify the number of clusters  
+
+```{r}
+library(ggplot2)
+prcomp_counts <- prcomp(t(GxE_counts)) #gene wise
+scores <- as.data.frame(prcomp_counts$rotation)[,c(1,2)]
+
+set.seed(25) #make this repeatable as kmeans has random starting positions
+fit <- kmeans(GxE_counts, 9)
+clus <- as.data.frame(fit$cluster)
+names(clus) <- paste("cluster")
+
+plotting <- merge(clus, scores, by = "row.names")
+plotting$cluster <- as.factor(plotting$cluster)
+
+# plot of observations
+ggplot(data = plotting, aes(x = PC1, y = PC2, label = Row.names, color = cluster)) +
+  geom_hline(yintercept = 0, colour = "gray65") +
+  geom_vline(xintercept = 0, colour = "gray65") +
+  geom_point(alpha = 0.8, size = 4, stat = "identity") 
+```
+
+
+
+```{r}
+library(cluster)
+set.seed(125)
+gap <- clusGap(GxE_counts, FUN = kmeans, iter.max = 30, K.max = 20, B = 500, verbose=interactive())
+plot(gap, main = "Gap Statistic")
+```
+
+
+```{r}
+with(gap, maxSE(Tab[,"gap"], Tab[,"SE.sim"], method="firstSEmax"))
+```
+
